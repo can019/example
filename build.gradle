@@ -1,0 +1,156 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.2.5'
+	id 'io.spring.dependency-management' version '1.1.4'
+	id 'jacoco'
+}
+
+group = 'com.github.can019'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	sourceCompatibility = '21'
+}
+
+jacoco {
+	toolVersion = "0.8.11"
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-devtools'
+	implementation 'com.fasterxml.uuid:java-uuid-generator:5.0.0'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	runtimeOnly 'com.h2database:h2'
+	runtimeOnly 'com.mysql:mysql-connector-j'
+
+	// aop
+	implementation 'org.springframework.boot:spring-boot-starter-aop'
+
+	// docker compose
+	testAndDevelopmentOnly("org.springframework.boot:spring-boot-docker-compose")
+
+	// lombok
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	testCompileOnly 'org.projectlombok:lombok'
+	testAnnotationProcessor 'org.projectlombok:lombok'
+
+	// Logback을 log4j2로 대체
+	implementation("org.springframework.boot:spring-boot-starter-log4j2")
+	implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
+	modules {
+		module("org.springframework.boot:spring-boot-starter-logging") {
+			replacedBy("org.springframework.boot:spring-boot-starter-log4j2")
+		}
+	}
+
+	// actuator
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+}
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+		extendsFrom testAnnotationProcessor
+	}
+	integrationTestImplementation.extendsFrom implementation
+	integrationTestImplementation.extendsFrom testImplementation
+	integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+
+	unitTestImplementation.extendsFrom implementation
+	unitTestImplementation.extendsFrom testImplementation
+	unitTestRuntimeOnly.extendsFrom testRuntimeOnly
+
+	unitTestCompileOnly.extendsFrom testCompileOnly
+	unitTestAnnotationProcessor.extendsFrom testAnnotationProcessor
+	integrationTestCompileOnly.extendsFrom testCompileOnly
+	integrationTestAnnotationProcessor.extendsFrom testAnnotationProcessor
+
+}
+
+sourceSets {
+	integrationTest {
+		java.srcDir "$projectDir/src/integration/java"
+		resources.srcDir "$projectDir/src/integration/resources"
+		compileClasspath += main.output + test.output
+		runtimeClasspath += main.output + test.output
+	}
+
+	unitTest {
+		java.srcDir "$projectDir/src/unit/java"
+		resources.srcDir "$projectDir/src/unit/resources"
+		compileClasspath += main.output + test.output
+		runtimeClasspath += main.output + test.output
+	}
+}
+tasks.withType(JacocoReport) {
+	reports {
+		html.required = true
+		xml.required = true
+		csv.required = false
+	}
+}
+
+tasks.withType(Test){
+	useJUnitPlatform()
+}
+
+task integrationTest(type: Test) {
+    description = 'Integration test' // 태스크 설명
+	group = 'test'
+
+	testClassesDirs = sourceSets.integrationTest.output.classesDirs
+	classpath = sourceSets.integrationTest.runtimeClasspath
+	jacoco {
+		destinationFile = layout.buildDirectory.file("jacoco/${name}.exec").get().asFile
+	}
+}
+
+task unitTest(type: Test) {
+	description = 'Unit test' // 태스크 설명
+	group = 'test'
+
+	testClassesDirs = sourceSets.unitTest.output.classesDirs
+	classpath = sourceSets.unitTest.runtimeClasspath
+	jacoco {
+		destinationFile = layout.buildDirectory.file("jacoco/${name}.exec").get().asFile
+	}
+}
+
+task unitTestJacocoReport(type: JacocoReport) {
+	executionData fileTree(dir: "$buildDir/jacoco/", include: "**/unitTest.exec")
+	sourceSets sourceSets.main
+	reports {
+		xml.destination file("$buildDir/reports/jacoco/unitTest/index.xml")
+		html.destination file("$buildDir/reports/jacoco/unitTest/html")
+	}
+}
+
+task integrationTestJacocoReport(type: JacocoReport) {
+	executionData fileTree(dir: "$buildDir/jacoco/", include: "**/integrationTest.exec")
+	sourceSets sourceSets.main
+	reports {
+		xml.destination file("$buildDir/reports/jacoco/integrationTest/index.xml")
+		html.destination file("$buildDir/reports/jacoco/integrationTest/html")
+	}
+}
+
+task overAllJacocoTestReport(type: JacocoReport) {
+	executionData fileTree(dir: "$buildDir/jacoco/", include: "**/*.exec")
+	sourceSets sourceSets.main
+	reports {
+		xml.destination file("$buildDir/reports/jacoco/total/index.xml")
+		html.destination file("$buildDir/reports/jacoco/total/html")
+	}
+}
+
+check.dependsOn integrationTest
+check.dependsOn unitTest
